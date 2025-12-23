@@ -18,10 +18,10 @@ open TodoApp.Helpers
 def loginForm : Action := fun ctx => do
   -- Redirect if already logged in
   if isLoggedIn ctx then
-    Action.redirect "/todos"
+    Action.redirect "/todos" ctx
   else
     let html := TodoApp.Views.Auth.renderLogin ctx
-    Action.html html
+    Action.html html ctx
 
 /-- Process login -/
 def login : Action := fun ctx => do
@@ -31,13 +31,13 @@ def login : Action := fun ctx => do
   -- Validate input
   if email.isEmpty || password.isEmpty then
     let ctx := ctx.withFlash fun f => f.set "error" "Email and password are required"
-    return ← Action.redirect "/login"
+    return ← Action.redirect "/login" ctx
 
   -- Find user by email
   match findUserByEmail ctx email with
   | none =>
     let ctx := ctx.withFlash fun f => f.set "error" "Invalid email or password"
-    Action.redirect "/login"
+    Action.redirect "/login" ctx
   | some userId =>
     -- Check password
     let storedHash := getAttrString ctx userId userPasswordHash
@@ -52,22 +52,22 @@ def login : Action := fun ctx => do
           s.set "user_id" (toString userId.id)
            |>.set "user_name" userName
         let ctx := ctx.withFlash fun f => f.set "success" s!"Welcome back, {userName}!"
-        Action.redirect "/todos"
+        Action.redirect "/todos" ctx
       else
         let ctx := ctx.withFlash fun f => f.set "error" "Invalid email or password"
-        Action.redirect "/login"
+        Action.redirect "/login" ctx
     | none =>
       let ctx := ctx.withFlash fun f => f.set "error" "Invalid email or password"
-      Action.redirect "/login"
+      Action.redirect "/login" ctx
 
 /-- Show register form -/
 def registerForm : Action := fun ctx => do
   -- Redirect if already logged in
   if isLoggedIn ctx then
-    Action.redirect "/todos"
+    Action.redirect "/todos" ctx
   else
     let html := TodoApp.Views.Auth.renderRegister ctx
-    Action.html html
+    Action.html html ctx
 
 /-- Process registration -/
 def register : Action := fun ctx => do
@@ -78,19 +78,19 @@ def register : Action := fun ctx => do
   -- Validate input
   if name.isEmpty || email.isEmpty || password.isEmpty then
     let ctx := ctx.withFlash fun f => f.set "error" "All fields are required"
-    return ← Action.redirect "/register"
+    return ← Action.redirect "/register" ctx
 
   -- Check if email already exists
   match findUserByEmail ctx email with
   | some _ =>
     let ctx := ctx.withFlash fun f => f.set "error" "Email already registered"
-    Action.redirect "/register"
+    Action.redirect "/register" ctx
   | none =>
     -- Create user
     match ctx.db with
     | none =>
       let ctx := ctx.withFlash fun f => f.set "error" "Database not available"
-      Action.redirect "/register"
+      Action.redirect "/register" ctx
     | some conn =>
       let (userId, conn) := conn.allocEntityId
       let passwordHash := hashPassword password ctx.config.secretKey
@@ -107,15 +107,62 @@ def register : Action := fun ctx => do
           s.set "user_id" (toString userId.id)
            |>.set "user_name" name
         let ctx := ctx.withFlash fun f => f.set "success" s!"Welcome, {name}! Your account has been created."
-        Action.redirect "/todos"
+        Action.redirect "/todos" ctx
       | Except.error e =>
         let ctx := ctx.withFlash fun f => f.set "error" s!"Failed to create account: {e}"
-        Action.redirect "/register"
+        Action.redirect "/register" ctx
 
 /-- Process logout -/
 def logout : Action := fun ctx => do
   let ctx := ctx.withSession fun s => s.clear
   let ctx := ctx.withFlash fun f => f.set "info" "You have been logged out"
-  Action.redirect "/"
+  Action.redirect "/" ctx
+
+/-- Process login with shared database reference (same as login, no writes needed) -/
+def loginWithRef (_dbRef : IO.Ref Connection) : Action := login
+
+/-- Process registration with shared database reference -/
+def registerWithRef (dbRef : IO.Ref Connection) : Action := fun ctx => do
+  let name := ctx.paramD "name" ""
+  let email := ctx.paramD "email" ""
+  let password := ctx.paramD "password" ""
+
+  -- Validate input
+  if name.isEmpty || email.isEmpty || password.isEmpty then
+    let ctx := ctx.withFlash fun f => f.set "error" "All fields are required"
+    return ← Action.redirect "/register" ctx
+
+  -- Check if email already exists
+  match findUserByEmail ctx email with
+  | some _ =>
+    let ctx := ctx.withFlash fun f => f.set "error" "Email already registered"
+    Action.redirect "/register" ctx
+  | none =>
+    -- Create user
+    match ctx.db with
+    | none =>
+      let ctx := ctx.withFlash fun f => f.set "error" "Database not available"
+      Action.redirect "/register" ctx
+    | some conn =>
+      let (userId, conn) := conn.allocEntityId
+      let passwordHash := hashPassword password ctx.config.secretKey
+      let tx : Transaction := [
+        .add userId userName (.string name),
+        .add userId userEmail (.string email),
+        .add userId userPasswordHash (.string passwordHash)
+      ]
+      match conn.transact tx with
+      | Except.ok (newConn, _) =>
+        -- Persist to shared database
+        dbRef.set newConn
+        -- Log in the new user
+        let ctx := ctx.withSession fun s =>
+          s.set "user_id" (toString userId.id)
+           |>.set "user_name" name
+        let ctx := ctx.withFlash fun f => f.set "success" s!"Welcome, {name}! Your account has been created."
+        Action.redirect "/todos" ctx
+      | Except.error e =>
+        let ctx := ctx.withFlash fun f => f.set "error" s!"Failed to create account: {e}"
+        Action.redirect "/register" ctx
 
 end TodoApp.Actions.Auth

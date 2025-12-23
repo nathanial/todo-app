@@ -20,8 +20,14 @@ def config : AppConfig := {
   csrfEnabled := true
 }
 
-/-- Build the application with all routes -/
-def buildApp : App :=
+/-- Shared database connection reference -/
+def sharedDbRef : IO (IO.Ref Ledger.Connection) :=
+  IO.mkRef Ledger.Connection.create
+
+/-- Build the application with all routes using shared database -/
+def buildApp (dbRef : IO.Ref Ledger.Connection) : App :=
+  -- Create a factory that returns the shared connection
+  let sharedFactory : Database.ConnectionFactory := dbRef.get
   Loom.app config
     -- Middleware
     |>.use Middleware.logging
@@ -29,22 +35,24 @@ def buildApp : App :=
     -- Public routes
     |>.get "/" "home" Actions.Home.index
     |>.get "/login" "login_form" Actions.Auth.loginForm
-    |>.post "/login" "login" Actions.Auth.login
+    |>.post "/login" "login" (Actions.Auth.loginWithRef dbRef)
     |>.get "/register" "register_form" Actions.Auth.registerForm
-    |>.post "/register" "register" Actions.Auth.register
+    |>.post "/register" "register" (Actions.Auth.registerWithRef dbRef)
     |>.get "/logout" "logout" Actions.Auth.logout
     -- Protected routes (auth check happens in actions)
     |>.get "/todos" "todos_index" Actions.Todos.index
-    |>.post "/todos" "todos_create" Actions.Todos.create
-    |>.post "/todos/:id/toggle" "todos_toggle" Actions.Todos.toggle
-    |>.post "/todos/:id/delete" "todos_delete" Actions.Todos.delete
-    -- Database
-    |>.withDefaultDatabase
+    |>.post "/todos" "todos_create" (Actions.Todos.createWithRef dbRef)
+    |>.post "/todos/:id/toggle" "todos_toggle" (Actions.Todos.toggleWithRef dbRef)
+    |>.post "/todos/:id/delete" "todos_delete" (Actions.Todos.deleteWithRef dbRef)
+    -- Database with shared factory
+    |>.withDatabase sharedFactory
 
 /-- Main entry point (inside namespace) -/
 def runApp : IO Unit := do
   IO.println "Starting Todo App..."
-  let app := buildApp
+  IO.println "Database: In-memory (shared across requests)"
+  let dbRef ← sharedDbRef
+  let app := buildApp dbRef
   app.run "0.0.0.0" 3000
 
 end TodoApp

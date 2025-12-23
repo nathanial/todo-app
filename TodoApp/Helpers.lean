@@ -46,7 +46,7 @@ def requireAuth (action : Action) : Action := fun ctx => do
   match ctx.session.get "user_id" with
   | none =>
     let ctx := ctx.withFlash fun f => f.set "error" "Please log in to continue"
-    Action.redirect "/login"
+    Action.redirect "/login" ctx
   | some _ => action ctx
 
 /-- Get current user ID from session -/

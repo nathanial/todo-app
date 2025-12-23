@@ -11,6 +11,6 @@ open Loom
 /-- Home page action -/
 def index : Action := fun ctx => do
   let html := TodoApp.Views.Home.render ctx
-  Action.html html
+  Action.html html ctx
 
 end TodoApp.Actions.Home
