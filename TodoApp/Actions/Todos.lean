@@ -169,4 +169,104 @@ def delete : Action := fun ctx => do
             let ctx := ctx.withFlash fun f => f.set "error" "Todo not found"
             Action.redirect "/todos" ctx
 
+/-- Show edit form for a todo -/
+def editForm : Action := fun ctx => do
+  let todoIdStr := ctx.paramD "id" ""
+
+  match todoIdStr.toInt? with
+  | none =>
+    let ctx := ctx.withFlash fun f => f.set "error" "Invalid todo"
+    Action.redirect "/todos" ctx
+  | some todoIdInt =>
+    let todoId : EntityId := ⟨todoIdInt⟩
+
+    -- Verify ownership
+    match currentUserId ctx with
+    | none => Action.redirect "/login" ctx
+    | some userIdStr =>
+      match userIdStr.toInt? with
+      | none => Action.redirect "/login" ctx
+      | some userId =>
+        match ctx.database with
+        | none =>
+          let ctx := ctx.withFlash fun f => f.set "error" "Database not available"
+          Action.redirect "/todos" ctx
+        | some db =>
+          -- Check owner
+          match db.getOne todoId todoOwner with
+          | some (.ref ownerId) =>
+            if ownerId.id != userId then
+              let ctx := ctx.withFlash fun f => f.set "error" "Not authorized"
+              Action.redirect "/todos" ctx
+            else
+              -- Load the todo
+              match loadTodo ctx todoId with
+              | none =>
+                let ctx := ctx.withFlash fun f => f.set "error" "Todo not found"
+                Action.redirect "/todos" ctx
+              | some todo =>
+                let html := TodoApp.Views.Todos.renderEditForm ctx todo
+                Action.html html ctx
+          | _ =>
+            let ctx := ctx.withFlash fun f => f.set "error" "Todo not found"
+            Action.redirect "/todos" ctx
+
+/-- Update a todo's title -/
+def edit : Action := fun ctx => do
+  let todoIdStr := ctx.paramD "id" ""
+  let newTitle := ctx.paramD "title" ""
+
+  -- Validate input
+  if newTitle.isEmpty then
+    let ctx := ctx.withFlash fun f => f.set "error" "Todo title is required"
+    return ← Action.redirect s!"/todos/{todoIdStr}/edit" ctx
+
+  match todoIdStr.toInt? with
+  | none =>
+    let ctx := ctx.withFlash fun f => f.set "error" "Invalid todo"
+    Action.redirect "/todos" ctx
+  | some todoIdInt =>
+    let todoId : EntityId := ⟨todoIdInt⟩
+
+    -- Verify ownership
+    match currentUserId ctx with
+    | none => Action.redirect "/login" ctx
+    | some userIdStr =>
+      match userIdStr.toInt? with
+      | none => Action.redirect "/login" ctx
+      | some userId =>
+        match ctx.database with
+        | none =>
+          let ctx := ctx.withFlash fun f => f.set "error" "Database not available"
+          Action.redirect "/todos" ctx
+        | some db =>
+          -- Check owner
+          match db.getOne todoId todoOwner with
+          | some (.ref ownerId) =>
+            if ownerId.id != userId then
+              let ctx := ctx.withFlash fun f => f.set "error" "Not authorized"
+              Action.redirect "/todos" ctx
+            else
+              -- Get current title value
+              match db.getOne todoId todoTitle with
+              | some (.string oldTitle) =>
+                -- Update title: retract old, add new
+                let tx : Transaction := [
+                  .retract todoId todoTitle (.string oldTitle),
+                  .add todoId todoTitle (.string newTitle)
+                ]
+                match ← ctx.transact tx with
+                | Except.ok ctx =>
+                  let ctx := ctx.withFlash fun f => f.set "success" "Todo updated!"
+                  Action.redirect "/todos" ctx
+                | Except.error e =>
+                  let ctx := ctx.withFlash fun f => f.set "error" s!"Failed to update todo: {e}"
+                  Action.redirect "/todos" ctx
+              | _ =>
+                let ctx := ctx.withFlash fun f => f.set "error" "Todo not found"
+                Action.redirect "/todos" ctx
+          | _ =>
+            let ctx := ctx.withFlash fun f => f.set "error" "Todo not found"
+            Action.redirect "/todos" ctx
+
 end TodoApp.Actions.Todos

@@ -26,6 +26,8 @@ def todoItem (ctx : Context) (todo : TodoData) : HtmlM Unit := do
           button [type_ "submit", class_ "btn btn-small"] (text "Undo")
         else
           button [type_ "submit", class_ "btn btn-success btn-small"] (text "Done")
+      -- Edit link
+      a [href_ s!"/todos/{todo.id.id}/edit", class_ "btn btn-small"] (text "Edit")
       -- Delete form
       form [method_ "post", action_ s!"/todos/{todo.id.id}/delete"] do
         csrfField ctx.csrfToken
@@ -71,5 +73,24 @@ def indexContent (ctx : Context) (todos : List TodoData) : HtmlM Unit := do
 /-- Render todos index page -/
 def renderIndex (ctx : Context) (todos : List TodoData) : String :=
   Layout.render ctx "My Todos - Todo App" (indexContent ctx todos)
+
+/-- Edit todo form content -/
+def editContent (ctx : Context) (todo : TodoData) : HtmlM Unit := do
+  h1 [] (text "Edit Todo")
+
+  div [class_ "card"] do
+    form [method_ "post", action_ s!"/todos/{todo.id.id}/edit"] do
+      csrfField ctx.csrfToken
+      div [class_ "form-group"] do
+        label [for_ "title"] (text "Title")
+        input [type_ "text", name_ "title", id_ "title", value_ todo.title, required_,
+               style_ "width: 100%;"]
+      div [style_ "display: flex; gap: 10px; margin-top: 15px;"] do
+        button [type_ "submit", class_ "btn btn-success"] (text "Save")
+        a [href_ "/todos", class_ "btn"] (text "Cancel")
+
+/-- Render edit form page -/
+def renderEditForm (ctx : Context) (todo : TodoData) : String :=
+  Layout.render ctx "Edit Todo - Todo App" (editContent ctx todo)
 
 end TodoApp.Views.Todos

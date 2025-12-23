@@ -41,6 +41,8 @@ def buildApp : App :=
     |>.post "/todos" "todos_create" Actions.Todos.create
     |>.post "/todos/:id/toggle" "todos_toggle" Actions.Todos.toggle
     |>.post "/todos/:id/delete" "todos_delete" Actions.Todos.delete
+    |>.get "/todos/:id/edit" "todos_edit_form" Actions.Todos.editForm
+    |>.post "/todos/:id/edit" "todos_edit" Actions.Todos.edit
     -- Persistent database (auto-persists to JSONL)
     |>.withPersistentDatabase journalPath
 
