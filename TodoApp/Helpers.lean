@@ -1,0 +1,124 @@
+/-
+  TodoApp.Helpers - Auth guards, database utilities, password hashing
+-/
+import Loom
+import Ledger
+import TodoApp.Models
+
+namespace TodoApp.Helpers
+
+open Loom
+open Ledger
+open TodoApp.Models
+
+/-! ## Password Hashing -/
+
+/-- Simple polynomial hash (demo only - use bcrypt/argon2 in production) -/
+private def polyHash (data : ByteArray) : Nat :=
+  let prime : Nat := 31
+  data.foldl (init := 0) fun hash byte =>
+    hash * prime + byte.toNat
+
+/-- Convert Nat to hex string with padding -/
+private def toHexString (n : Nat) : String :=
+  let hex := n.toDigits 16
+  String.mk hex
+
+/-- Hash a password with the app secret -/
+def hashPassword (password : String) (secret : ByteArray) : String :=
+  -- Combine secret and password with length for uniqueness
+  let passBytes := password.toUTF8
+  let combined := secret ++ passBytes
+  let hash1 := polyHash combined
+  -- Mix in the hash itself for a second round
+  let hash1Str := toString hash1
+  let hash2 := polyHash (combined ++ hash1Str.toUTF8)
+  s!"{toHexString hash1}-{toHexString hash2}"
+
+/-- Verify a password against a hash -/
+def verifyPassword (password hash : String) (secret : ByteArray) : Bool :=
+  hashPassword password secret == hash
+
+/-! ## Auth Guards -/
+
+/-- Require authentication - redirect to login if not authenticated -/
+def requireAuth (action : Action) : Action := fun ctx => do
+  match ctx.session.get "user_id" with
+  | none =>
+    let ctx := ctx.withFlash fun f => f.set "error" "Please log in to continue"
+    Action.redirect "/login"
+  | some _ => action ctx
+
+/-- Get current user ID from session -/
+def currentUserId (ctx : Context) : Option String :=
+  ctx.session.get "user_id"
+
+/-- Get current user name from session -/
+def currentUserName (ctx : Context) : Option String :=
+  ctx.session.get "user_name"
+
+/-- Check if user is logged in -/
+def isLoggedIn (ctx : Context) : Bool :=
+  ctx.session.has "user_id"
+
+/-! ## Database Helpers -/
+
+/-- Find user by email -/
+def findUserByEmail (ctx : Context) (email : String) : Option EntityId :=
+  ctx.db.bind fun conn =>
+    let db := conn.db
+    db.findOneByAttrValue userEmail (.string email)
+
+/-- Find user by ID -/
+def findUserById (ctx : Context) (id : String) : Option EntityId :=
+  match id.toInt? with
+  | some n => some ⟨n⟩
+  | none => none
+
+/-- Get all todos for a user -/
+def getUserTodos (ctx : Context) (userId : EntityId) : List EntityId :=
+  match ctx.db with
+  | none => []
+  | some conn =>
+    let db := conn.db
+    db.findByAttrValue todoOwner (.ref userId)
+
+/-- Get a single attribute value as string -/
+def getAttrString (ctx : Context) (entityId : EntityId) (attr : Attribute) : Option String :=
+  ctx.db.bind fun conn =>
+    match conn.db.getOne entityId attr with
+    | some (.string s) => some s
+    | _ => none
+
+/-- Get a single attribute value as bool -/
+def getAttrBool (ctx : Context) (entityId : EntityId) (attr : Attribute) : Option Bool :=
+  ctx.db.bind fun conn =>
+    match conn.db.getOne entityId attr with
+    | some (.bool b) => some b
+    | _ => none
+
+/-- Todo data record for views -/
+structure TodoData where
+  id : EntityId
+  title : String
+  completed : Bool
+  deriving Repr, Inhabited
+
+/-- Load todo data from entity -/
+def loadTodo (ctx : Context) (todoId : EntityId) : Option TodoData :=
+  ctx.db.bind fun conn =>
+    let db := conn.db
+    let title := match db.getOne todoId todoTitle with
+      | some (.string s) => s
+      | _ => ""
+    let completed := match db.getOne todoId todoCompleted with
+      | some (.bool b) => b
+      | _ => false
+    some { id := todoId, title, completed }
+
+/-- Load all todos for user as TodoData list -/
+def loadUserTodos (ctx : Context) (userId : EntityId) : List TodoData :=
+  getUserTodos ctx userId
+    |>.filterMap (loadTodo ctx)
+
+end TodoApp.Helpers

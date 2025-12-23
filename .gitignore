@@ -1,0 +1,14 @@
+# Build artifacts
+.lake/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# macOS
+.DS_Store
+
+# Lake manifest (regenerated on build)
+lake-manifest.json
