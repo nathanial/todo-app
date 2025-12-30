@@ -1,5 +1,4 @@
 # Build artifacts
-.lake/
 
 # Editor/IDE
 .vscode/
@@ -11,6 +10,7 @@
 .DS_Store
 
 # Lake manifest (regenerated on build)
-lake-manifest.json
 
 data/
+.lake
+lake-manifest.json
