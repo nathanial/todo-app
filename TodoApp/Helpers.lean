@@ -42,12 +42,12 @@ def verifyPassword (password hash : String) (secret : ByteArray) : Bool :=
 /-! ## Auth Guards -/
 
 /-- Require authentication - redirect to login if not authenticated -/
-def requireAuth (action : Action) : Action := fun ctx => do
+def requireAuth (handler : Action) : Action := fun ctx => do
   match ctx.session.get "user_id" with
   | none =>
     let ctx := ctx.withFlash fun f => f.set "error" "Please log in to continue"
     Action.redirect "/login" ctx
-  | some _ => action ctx
+  | some _ => handler ctx
 
 /-- Get current user ID from session -/
 def currentUserId (ctx : Context) : Option String :=

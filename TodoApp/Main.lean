@@ -30,19 +30,19 @@ def buildApp : App :=
     |>.use Middleware.logging
     |>.use Middleware.securityHeaders
     -- Public routes
-    |>.get "/" "home" Actions.Home.index
-    |>.get "/login" "login_form" Actions.Auth.loginForm
-    |>.post "/login" "login" Actions.Auth.login
-    |>.get "/register" "register_form" Actions.Auth.registerForm
-    |>.post "/register" "register" Actions.Auth.register
-    |>.get "/logout" "logout" Actions.Auth.logout
+    |>.get "/" "home" [] Actions.Home.index
+    |>.get "/login" "login_form" [] Actions.Auth.loginForm
+    |>.post "/login" "login" [] Actions.Auth.login
+    |>.get "/register" "register_form" [] Actions.Auth.registerForm
+    |>.post "/register" "register" [] Actions.Auth.register
+    |>.get "/logout" "logout" [] Actions.Auth.logout
     -- Protected routes (auth check happens in actions)
-    |>.get "/todos" "todos_index" Actions.Todos.index
-    |>.post "/todos" "todos_create" Actions.Todos.create
-    |>.post "/todos/:id/toggle" "todos_toggle" Actions.Todos.toggle
-    |>.post "/todos/:id/delete" "todos_delete" Actions.Todos.delete
-    |>.get "/todos/:id/edit" "todos_edit_form" Actions.Todos.editForm
-    |>.post "/todos/:id/edit" "todos_edit" Actions.Todos.edit
+    |>.get "/todos" "todos_index" [] Actions.Todos.index
+    |>.post "/todos" "todos_create" [] Actions.Todos.create
+    |>.post "/todos/:id/toggle" "todos_toggle" [] Actions.Todos.toggle
+    |>.post "/todos/:id/delete" "todos_delete" [] Actions.Todos.delete
+    |>.get "/todos/:id/edit" "todos_edit_form" [] Actions.Todos.editForm
+    |>.post "/todos/:id/edit" "todos_edit" [] Actions.Todos.edit
     -- Persistent database (auto-persists to JSONL)
     |>.withPersistentDatabase journalPath
 
