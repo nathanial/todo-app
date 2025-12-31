@@ -4,7 +4,7 @@ open Lake DSL
 package todoApp where
   version := v!"0.1.0"
 
-require loom from git "https://github.com/nathanial/loom" @ "v0.0.1"
+require loom from git "https://github.com/nathanial/loom" @ "v0.0.2"
 require crucible from git "https://github.com/nathanial/crucible" @ "v0.0.1"
 
 -- OpenSSL linking (required by citadel's TLS support via loom)
