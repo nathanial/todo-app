@@ -5,7 +5,7 @@ package todoApp where
   version := v!"0.1.0"
 
 require loom from git "https://github.com/nathanial/loom" @ "v0.0.9"
-require crucible from git "https://github.com/nathanial/crucible" @ "v0.0.7"
+require crucible from git "https://github.com/nathanial/crucible" @ "v0.0.8"
 
 -- OpenSSL linking (required by citadel's TLS support via loom)
 -- Lake doesn't propagate moreLinkArgs from dependencies, so we must add them here
