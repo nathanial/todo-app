@@ -154,8 +154,6 @@ test "can find todos by owner" := do
     todos.length ≡ 2
   | Except.error e => panic! s!"Transaction failed: {e}"
 
-#generate_tests
-
 -- Main entry point
 def main : IO UInt32 := do
   IO.println "TodoApp Tests"
